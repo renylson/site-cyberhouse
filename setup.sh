@@ -37,12 +37,6 @@ echo -e "${GREEN}✅ Diretórios criados${NC}"
 echo -e "${BLUE}🐳 Construindo e iniciando containers Docker...${NC}"
 docker compose up -d --build
 
-echo -e "${BLUE}⏳ Aguardando containers iniciarem...${NC}"
-sleep 10
-
-echo -e "${BLUE}🌱 Executando seed do banco de dados...${NC}"
-docker compose exec -T backend npm run seed
-
 echo ""
 echo -e "${GREEN}========================================${NC}"
 echo -e "${GREEN}✅ Setup concluído com sucesso!${NC}"

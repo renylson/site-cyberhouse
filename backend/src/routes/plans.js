@@ -16,7 +16,7 @@ router.get('/', asyncHandler(async (req, res) => {
     success: true,
     count: result.rows.length,
     data: result.rows
-  }));
+  });
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {
@@ -35,7 +35,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   res.json({
     success: true,
     data: result.rows[0]
-  }));
+  });
 }));
 
 router.post(
