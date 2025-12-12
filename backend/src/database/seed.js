@@ -13,9 +13,9 @@ const seedDatabase = async () => {
     await query('DELETE FROM users WHERE email = $1', ['admin@cyberhouse.com.br']);
     
     await query(
-      `INSERT INTO users (email, password, name, role) 
-       VALUES ($1, $2, $3, $4)`,
-      ['admin@cyberhouse.com.br', hashedPassword, 'Administrador', 'admin']
+      `INSERT INTO users (email, password, name, role, username) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      ['admin@cyberhouse.com.br', hashedPassword, 'Administrador', 'admin', 'admin']
     );
     console.log('✅ Admin user created (email: admin@cyberhouse.com.br, password: admin123456)');
 
@@ -86,16 +86,50 @@ const seedDatabase = async () => {
     }
     console.log('✅ Plans seeded successfully');
 
+    // Seed positions
+    const positions = [
+      {
+        name: 'Técnico de Redes',
+        description: 'Responsável pela manutenção e configuração de redes de computadores',
+        is_active: true
+      },
+      {
+        name: 'Atendente',
+        description: 'Atendimento ao cliente e suporte técnico',
+        is_active: true
+      },
+      {
+        name: 'Instalador',
+        description: 'Instalação de equipamentos e serviços',
+        is_active: true
+      },
+      {
+        name: 'Vendedor',
+        description: 'Vendas de planos e serviços de internet',
+        is_active: true
+      }
+    ];
+
+    for (const position of positions) {
+      await query(
+        'INSERT INTO job_positions (name, description, is_active) VALUES ($1, $2, $3) ON CONFLICT (name) DO NOTHING',
+        [position.name, position.description, position.is_active]
+      );
+    }
+    console.log('✅ Positions seeded successfully');
+
   await query(`
-    INSERT INTO settings (id, phone, whatsapp, address, client_area_url, created_at, updated_at)
-    VALUES (1, $1, $2, $3, $4, NOW(), NOW())
+    INSERT INTO settings (id, phone, whatsapp, address, client_area_url, logo, favicon, created_at, updated_at)
+    VALUES (1, $1, $2, $3, $4, $5, $6, NOW(), NOW())
     ON CONFLICT (id) DO UPDATE
-    SET phone = $1, whatsapp = $2, address = $3, client_area_url = $4, updated_at = NOW()
+    SET phone = $1, whatsapp = $2, address = $3, client_area_url = $4, logo = $5, favicon = $6, updated_at = NOW()
   `, [
     '(87) 98169-0984',
     '5587988694529',
     'Rua 11, nº 50 - Cosme e Damião - Petrolina-PE',
-    'https://cliente.cyberhousenet.com.br'
+    'https://cliente.cyberhousenet.com.br',
+    '/uploads/settings/logo.png',
+    '/uploads/settings/favicon.png'
   ]);
   console.log('✅ Settings seeded successfully');
 

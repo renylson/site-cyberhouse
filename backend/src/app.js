@@ -16,6 +16,7 @@ const applicationsRoutes = require('./routes/applications');
 const contactRoutes = require('./routes/contact');
 const settingsRoutes = require('./routes/settings');
 const usersRoutes = require('./routes/users');
+const positionsRoutes = require('./routes/positions');
 
 const app = express();
 
@@ -49,7 +50,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-app.use('/api/', rateLimiter);
+// app.use('/api/', rateLimiter); // Rate limiting removed
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
@@ -65,6 +66,7 @@ app.use('/api/applications', applicationsRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/positions', positionsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ 

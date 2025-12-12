@@ -16,9 +16,9 @@ const generateToken = (id) => {
 
 router.post(
   '/login',
-  authRateLimiter,
+  // authRateLimiter, // Rate limiting removed
   [
-    body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+    body('username').notEmpty().withMessage('Username is required'),
     body('password').notEmpty().withMessage('Password is required')
   ],
   asyncHandler(async (req, res) => {
@@ -30,11 +30,11 @@ router.post(
       });
     }
 
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
     const result = await query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
+      'SELECT * FROM users WHERE username = $1',
+      [username]
     );
 
     if (result.rows.length === 0) {

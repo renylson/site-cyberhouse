@@ -3,15 +3,17 @@ const { body, validationResult } = require('express-validator');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { protect, authorize } = require('../middleware/auth');
 const { uploadRateLimiter } = require('../middleware/rateLimiter');
-const upload = require('../middleware/upload');
+const resumeUpload = require('../middleware/upload').resumeUpload;
 const { query } = require('../database/db');
+const path = require('path');
+const fs = require('fs');
 
 const router = express.Router();
 
 router.post(
   '/',
-  uploadRateLimiter,
-  upload.single('resume'),
+  // uploadRateLimiter, // Rate limiting removed
+  resumeUpload.single('resume'),
   [
     body('name').trim().notEmpty().withMessage('Name is required'),
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
@@ -29,7 +31,15 @@ router.post(
     }
 
     const { name, email, phone, position, message } = req.body;
-    const resume_path = req.file ? req.file.path : null;
+    const resume_path = req.file ? req.file.path.replace(/^.*[\\\/]/, '') : null; // Store only filename
+
+    // Format name to proper case
+    const formattedName = name.trim().split(' ').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+    ).join(' ');
+
+    // Format phone number (Brazilian format)
+    const formattedPhone = phone.replace(/\D/g, '').replace(/(\d{2})(\d{4,5})(\d{4})/, '($1) $2-$3');
 
     if (!resume_path) {
       return res.status(400).json({
@@ -42,7 +52,7 @@ router.post(
       `INSERT INTO job_applications (name, email, phone, position, message, resume_path, status) 
        VALUES ($1, $2, $3, $4, $5, $6, 'pending') 
        RETURNING *`,
-      [name, email, phone, position, message || '', resume_path]
+      [formattedName, email, formattedPhone, position, message || '', resume_path]
     );
 
     res.status(201).json({
@@ -60,7 +70,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { status, limit = 50, offset = 0 } = req.query;
 
-    let queryText = 'SELECT * FROM job_applications';
+    let queryText = 'SELECT *, (\'/api/uploads/\' || regexp_replace(resume_path, \'.*/\', \'\', \'g\')) as resume_url FROM job_applications';
     let queryParams = [];
 
     if (status) {
@@ -93,7 +103,7 @@ router.get(
   authorize('admin'),
   asyncHandler(async (req, res) => {
     const result = await query(
-      'SELECT * FROM job_applications WHERE id = $1',
+      'SELECT *, (\'/api/uploads/\' || regexp_replace(resume_path, \'.*/\', \'\', \'g\')) as resume_url FROM job_applications WHERE id = $1',
       [req.params.id]
     );
 
@@ -163,6 +173,24 @@ router.delete(
         success: false,
         error: 'Application not found'
       });
+    }
+
+    // Remove the physical file
+    const resumePath = result.rows[0].resume_path;
+    if (resumePath) {
+      try {
+        // Extract filename from path if it's a full path
+        const filename = resumePath.replace(/^.*[\\\/]/, '');
+        const fullPath = path.join(__dirname, '../../uploads/resumes', filename);
+        
+        if (fs.existsSync(fullPath)) {
+          fs.unlinkSync(fullPath);
+          console.log(`File ${filename} deleted successfully`);
+        }
+      } catch (error) {
+        console.error('Error deleting file:', error);
+        // Don't fail the request if file deletion fails
+      }
     }
 
     res.json({

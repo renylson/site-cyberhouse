@@ -60,15 +60,11 @@ const initDatabase = async () => {
     `);
 
     await query(`
-      CREATE TABLE IF NOT EXISTS job_applications (
+      CREATE TABLE IF NOT EXISTS job_positions (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        phone VARCHAR(50) NOT NULL,
-        position VARCHAR(255) NOT NULL,
-        message TEXT,
-        resume_path VARCHAR(500),
-        status VARCHAR(50) DEFAULT 'pending',
+        name VARCHAR(255) NOT NULL UNIQUE,
+        description TEXT,
+        is_active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -101,6 +97,11 @@ const initDatabase = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT single_settings_row CHECK (id = 1)
       );
+    `);
+
+    // Add username column to users table if it doesn't exist
+    await query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(255) UNIQUE
     `);
 
     console.log('✅ Database tables initialized');

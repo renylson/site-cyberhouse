@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Upload, Send } from 'lucide-react';
 import api from '@/lib/api';
 import PublicPageWrapper from '@/components/PublicPageWrapper';
+
+interface Position {
+  id: number;
+  name: string;
+}
 
 interface ApplicationForm {
   name: string;
@@ -19,7 +24,21 @@ interface ApplicationForm {
 
 export default function TrabalheConoscoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [positions, setPositions] = useState<Position[]>([]);
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ApplicationForm>();
+
+  useEffect(() => {
+    loadPositions();
+  }, []);
+
+  const loadPositions = async () => {
+    try {
+      const res = await api.get('/positions/active');
+      setPositions(res.data.data);
+    } catch (error) {
+      console.error('Erro ao carregar cargos:', error);
+    }
+  };
 
   const onSubmit = async (data: ApplicationForm) => {
     setIsSubmitting(true);
@@ -137,13 +156,18 @@ export default function TrabalheConoscoPage() {
                 <label htmlFor="position" className="block text-sm font-semibold mb-2">
                   Cargo Pretendido *
                 </label>
-                <input
+                <select
                   {...register('position', { required: 'Cargo é obrigatório' })}
-                  type="text"
                   id="position"
                   className="input"
-                  placeholder="Ex: Técnico de Redes, Atendente, etc."
-                />
+                >
+                  <option value="">Selecione um cargo</option>
+                  {positions.map((position) => (
+                    <option key={position.id} value={position.name}>
+                      {position.name}
+                    </option>
+                  ))}
+                </select>
                 {errors.position && (
                   <p className="text-red-500 text-sm mt-1">{errors.position.message}</p>
                 )}

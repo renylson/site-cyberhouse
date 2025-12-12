@@ -12,7 +12,7 @@ router.use(authorize('admin'));
 
 router.get('/', asyncHandler(async (req, res) => {
   const result = await query(
-    'SELECT id, email, name, role, created_at FROM users ORDER BY created_at DESC'
+    'SELECT id, email, name, username, role, created_at FROM users ORDER BY created_at DESC'
   );
 
   res.json({
@@ -26,7 +26,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const result = await query(
-    'SELECT id, email, name, role, created_at FROM users WHERE id = $1',
+    'SELECT id, email, name, username, role, created_at FROM users WHERE id = $1',
     [id]
   );
 
@@ -47,6 +47,7 @@ router.post(
   '/',
   [
     body('email').isEmail().normalizeEmail().withMessage('E-mail inválido'),
+    body('username').notEmpty().withMessage('Username é obrigatório'),
     body('password').isLength({ min: 6 }).withMessage('Senha deve ter no mínimo 6 caracteres'),
     body('name').trim().notEmpty().withMessage('Nome é obrigatório'),
     body('role').optional().isIn(['admin', 'user']).withMessage('Role inválido')
@@ -60,27 +61,27 @@ router.post(
       });
     }
 
-    const { email, password, name, role = 'admin' } = req.body;
+    const { email, password, name, role, username } = req.body;
 
     const existingUser = await query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
+      'SELECT id FROM users WHERE email = $1 OR username = $2',
+      [email, username]
     );
 
     if (existingUser.rows.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'E-mail já cadastrado'
+        error: 'E-mail ou username já cadastrado'
       });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const result = await query(
-      `INSERT INTO users (email, password, name, role)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, email, name, role, created_at`,
-      [email, hashedPassword, name, role]
+      `INSERT INTO users (email, password, name, role, username)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, email, name, username, role, created_at`,
+      [email, hashedPassword, name, role, username]
     );
 
     res.status(201).json({
@@ -94,6 +95,7 @@ router.put(
   '/:id',
   [
     body('email').optional().isEmail().normalizeEmail().withMessage('E-mail inválido'),
+    body('username').optional().notEmpty().withMessage('Username não pode estar vazio'),
     body('name').optional().trim().notEmpty().withMessage('Nome não pode estar vazio'),
     body('role').optional().isIn(['admin', 'user']).withMessage('Role inválido')
   ],
@@ -107,16 +109,7 @@ router.put(
     }
 
     const { id } = req.params;
-    const { email, name, role } = req.body;
-
-    const existingUser = await query('SELECT id FROM users WHERE id = $1', [id]);
-
-    if (existingUser.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Usuário não encontrado'
-      });
-    }
+    const { email, name, role, username } = req.body;
 
     if (email) {
       const emailCheck = await query(
@@ -132,14 +125,29 @@ router.put(
       }
     }
 
+    if (username) {
+      const usernameCheck = await query(
+        'SELECT id FROM users WHERE username = $1 AND id != $2',
+        [username, id]
+      );
+
+      if (usernameCheck.rows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Username já está em uso'
+        });
+      }
+    }
+
     const result = await query(
       `UPDATE users
        SET email = COALESCE($1, email),
            name = COALESCE($2, name),
-           role = COALESCE($3, role)
-       WHERE id = $4
-       RETURNING id, email, name, role, created_at`,
-      [email, name, role, id]
+           username = COALESCE($3, username),
+           role = COALESCE($4, role)
+       WHERE id = $5
+       RETURNING id, email, name, username, role, created_at`,
+      [email, name, username, role, id]
     );
 
     res.json({
