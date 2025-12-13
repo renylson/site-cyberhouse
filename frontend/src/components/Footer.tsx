@@ -75,6 +75,11 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link href="/teste-velocidade" className="text-gray-300 hover:text-primary transition-colors">
+                  Teste de Velocidade
+                </Link>
+              </li>
+              <li>
                 <Link
                   href="/trabalhe-conosco"
                   className="text-gray-300 hover:text-primary transition-colors"

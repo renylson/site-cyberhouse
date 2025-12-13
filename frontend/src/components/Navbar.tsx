@@ -22,6 +22,7 @@ const Navbar = () => {
   const menuItems = [
     { label: 'Início', href: '/' },
     { label: 'Planos', href: '/planos' },
+    { label: 'Teste de Velocidade', href: '/teste-velocidade' },
     { label: 'Suporte', href: '/suporte' },
     { label: 'Trabalhe Conosco', href: '/trabalhe-conosco' },
   ];

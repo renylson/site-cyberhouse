@@ -5,23 +5,10 @@ import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
-async function getSettings() {
-  try {
-    const response = await fetch('/api/settings', {
-      cache: 'no-store',
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.data;
-  } catch (error) {
-    console.error('Error fetching settings:', error);
-    return null;
-  }
-}
-
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
-  const faviconUrl = settings?.favicon || '/favicon.ico';
+  // Use default values since we can't fetch from API during SSR
+  const faviconUrl = '/favicon.ico';
+  const logoUrl = '/logo.png';
 
   return {
     title: {
@@ -58,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description: 'Provedor de internet de alta velocidade com fibra óptica. Wi-Fi incluso, instalação grátis e suporte 24/7.',
       images: [
         {
-          url: settings?.logo || '/logo.png',
+          url: logoUrl,
           width: 1200,
           height: 630,
           alt: 'Cyberhouse - Internet de Alta Velocidade',
@@ -69,7 +56,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title: 'Cyberhouse - Internet de Alta Velocidade',
       description: 'Provedor de internet de alta velocidade com fibra óptica. Wi-Fi incluso, instalação grátis e suporte 24/7.',
-      images: [settings?.logo || '/logo.png'],
+      images: [logoUrl],
     },
     viewport: {
       width: 'device-width',

@@ -21,6 +21,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: 'https://cyberhousenet.com.br/teste-velocidade',
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    },
+    {
       url: 'https://cyberhousenet.com.br/trabalhe-conosco',
       lastModified: new Date(),
       changeFrequency: 'monthly',

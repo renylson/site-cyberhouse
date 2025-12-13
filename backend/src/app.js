@@ -17,6 +17,7 @@ const contactRoutes = require('./routes/contact');
 const settingsRoutes = require('./routes/settings');
 const usersRoutes = require('./routes/users');
 const positionsRoutes = require('./routes/positions');
+const speedTestRoutes = require('./routes/speed-test');
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/positions', positionsRoutes);
+app.use('/api/speed-test', speedTestRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ 
