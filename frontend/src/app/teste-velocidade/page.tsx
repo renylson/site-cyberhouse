@@ -93,62 +93,30 @@ export default function TesteVelocidadePage() {
   };
 
   const testDownload = async (): Promise<number> => {
-    const downloadSizes = [1, 2, 4, 8]; // MB
+    const downloadSizes = [5, 10, 20, 50]; // MB - aumentado para testes maiores
     const speeds: number[] = [];
-    let totalProgress = 0; // Começa do início
-    const minDuration = 10000; // 10 segundos mínimo
+    let totalProgress = 0;
+    const minDuration = 15000; // 15 segundos mínimo - aumentado
     const testStart = Date.now();
+    const maxConcurrent = 4; // Máximo de conexões paralelas
 
-    // Garantir que o teste dure pelo menos 10 segundos
+    // Garantir que o teste dure pelo menos 15 segundos
     while (Date.now() - testStart < minDuration) {
-      for (const size of downloadSizes) {
-        try {
-          const start = Date.now();
-
-          const response = await fetch(`/api/speed-test/download?size=${size}&t=${Date.now()}`, {
-            signal: abortControllerRef.current?.signal,
-            cache: 'no-cache',
-            method: 'GET'
-          });
-
-          if (!response.ok) throw new Error('Download failed');
-
-          const reader = response.body?.getReader();
-          if (!reader) throw new Error('No reader available');
-
-          let received = 0;
-          const total = size * 1024 * 1024; // bytes
-          const chunks: Uint8Array[] = [];
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            chunks.push(value);
-            received += value.length;
-
-            const elapsed = (Date.now() - start) / 1000; // seconds
-            const speedMbps = (received * 8) / (1024 * 1024) / elapsed; // Mbps
-
-            setCurrentSpeed(speedMbps);
-            const overallProgress = ((Date.now() - testStart) / minDuration) * 60; // 60% para download
-            setProgress(Math.min(overallProgress, 60));
-          }
-
-          const finalElapsed = (Date.now() - start) / 1000;
-          const finalSpeed = (total * 8) / (1024 * 1024) / finalElapsed;
-          speeds.push(finalSpeed);
-
-        } catch (error) {
-          console.error(`Download test ${size}MB failed:`, error);
-          speeds.push(0);
-        }
-
-        // Verificar se já passou 10 segundos
-        if (Date.now() - testStart >= minDuration) break;
+      // Executar testes em paralelo para melhor precisão
+      const promises = [];
+      for (let i = 0; i < maxConcurrent && Date.now() - testStart < minDuration; i++) {
+        const size = downloadSizes[Math.floor(Math.random() * downloadSizes.length)];
+        promises.push(testSingleDownload(size, testStart, minDuration));
       }
 
-      // Verificar se já passou 10 segundos
+      const results = await Promise.allSettled(promises);
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value > 0) {
+          speeds.push(result.value);
+        }
+      });
+
+      // Verificar se já passou o tempo mínimo
       if (Date.now() - testStart >= minDuration) break;
     }
 
@@ -157,6 +125,48 @@ export default function TesteVelocidadePage() {
     return validSpeeds.length > 0
       ? validSpeeds.reduce((sum, speed) => sum + speed, 0) / validSpeeds.length
       : 0;
+  };
+
+  const testSingleDownload = async (size: number, testStart: number, minDuration: number): Promise<number> => {
+    try {
+      const start = Date.now();
+
+      const response = await fetch(`/api/speed-test/download?size=${size}&t=${Date.now()}`, {
+        signal: abortControllerRef.current?.signal,
+        cache: 'no-cache',
+        method: 'GET'
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No reader available');
+
+      let received = 0;
+      const total = size * 1024 * 1024; // bytes
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        received += value.length;
+
+        const elapsed = (Date.now() - start) / 1000; // seconds
+        const speedMbps = (received * 8) / (1024 * 1024) / elapsed; // Mbps
+
+        setCurrentSpeed(speedMbps);
+        const overallProgress = ((Date.now() - testStart) / minDuration) * 60; // 60% para download
+        setProgress(Math.min(overallProgress, 60));
+      }
+
+      const finalElapsed = (Date.now() - start) / 1000;
+      const finalSpeed = (total * 8) / (1024 * 1024) / finalElapsed;
+      return finalSpeed;
+
+    } catch (error) {
+      console.error(`Download test ${size}MB failed:`, error);
+      return 0;
+    }
   };
 
   const testUpload = async (): Promise<number> => {
