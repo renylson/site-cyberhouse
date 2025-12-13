@@ -39,11 +39,11 @@ export default function TesteVelocidadePage() {
       const ipData = await ipResponse.json();
       setClientIP(ipData.ip);
 
-      // Teste de download (mínimo 10 segundos)
+      // Teste de download (mínimo 20 segundos)
       const downloadResult = await testDownload();
       setCurrentPhase('upload');
 
-      // Teste de upload (mínimo 10 segundos)
+      // Teste de upload (mínimo 20 segundos)
       const uploadResult = await testUpload();
       setCurrentPhase('ping');
 
@@ -80,7 +80,7 @@ export default function TesteVelocidadePage() {
         });
         const end = Date.now();
         pings.push(end - start);
-        setProgress(80 + (i + 1) / testCount * 20); // 80-100% para ping (último)
+        setProgress((i + 1) / testCount * 20); // 0-20% para ping
       } catch (error) {
         pings.push(999);
       }
@@ -93,12 +93,12 @@ export default function TesteVelocidadePage() {
   };
 
   const testDownload = async (): Promise<number> => {
-    const downloadSizes = [5, 10, 20, 50]; // MB - aumentado para testes maiores
+    const downloadSizes = [120, 120, 120, 120]; // ~480MB total como Fast.com
     const speeds: number[] = [];
     let totalProgress = 0;
-    const minDuration = 15000; // 15 segundos mínimo - aumentado
+    const minDuration = 20000; // 20 segundos mínimo
     const testStart = Date.now();
-    const maxConcurrent = 4; // Máximo de conexões paralelas
+    const maxConcurrent = 2; // 2 paralelos
 
     // Garantir que o teste dure pelo menos 15 segundos
     while (Date.now() - testStart < minDuration) {
@@ -155,8 +155,8 @@ export default function TesteVelocidadePage() {
         const speedMbps = (received * 8) / (1024 * 1024) / elapsed; // Mbps
 
         setCurrentSpeed(speedMbps);
-        const overallProgress = ((Date.now() - testStart) / minDuration) * 60; // 60% para download
-        setProgress(Math.min(overallProgress, 60));
+        const overallProgress = 20 + ((Date.now() - testStart) / minDuration) * 50; // 20-70% para download
+        setProgress(Math.min(overallProgress, 70));
       }
 
       const finalElapsed = (Date.now() - start) / 1000;
@@ -170,56 +170,29 @@ export default function TesteVelocidadePage() {
   };
 
   const testUpload = async (): Promise<number> => {
-    const uploadSizes = [0.5, 1, 2]; // MB
+    const uploadSizes = [180, 180, 180]; // ~540MB total como Fast.com
     const speeds: number[] = [];
-    const minDuration = 10000; // 10 segundos mínimo
+    const minDuration = 20000; // 20 segundos mínimo
     const testStart = Date.now();
+    const maxConcurrent = 1; // 1 para upload, já que é limitado
 
-    // Garantir que o teste dure pelo menos 10 segundos
+    // Garantir que o teste dure pelo menos 15 segundos
     while (Date.now() - testStart < minDuration) {
-      for (const size of uploadSizes) {
-        try {
-          // Cria dados de teste menores para upload
-          const dataSize = size * 1024 * 1024; // bytes
-          const chunkSize = 64 * 1024; // 64KB chunks
-          const data = new Uint8Array(dataSize);
-
-          // Preenche com dados aleatórios
-          for (let i = 0; i < dataSize; i++) {
-            data[i] = Math.floor(Math.random() * 256);
-          }
-
-          const start = Date.now();
-
-          const response = await fetch('/api/speed-test/upload', {
-            method: 'POST',
-            body: data,
-            signal: abortControllerRef.current?.signal,
-            headers: {
-              'Content-Type': 'application/octet-stream'
-            }
-          });
-
-          if (!response.ok) throw new Error('Upload failed');
-
-          const result = await response.json();
-          const speedMbps = result.speedMbps;
-
-          speeds.push(speedMbps);
-          setCurrentSpeed(speedMbps);
-          const overallProgress = 60 + ((Date.now() - testStart) / minDuration) * 20; // 60-80% para upload
-          setProgress(Math.min(overallProgress, 80));
-
-        } catch (error) {
-          console.error(`Upload test ${size}MB failed:`, error);
-          speeds.push(0);
-        }
-
-        // Verificar se já passou 10 segundos
-        if (Date.now() - testStart >= minDuration) break;
+      // Executar uploads em paralelo
+      const promises = [];
+      for (let i = 0; i < maxConcurrent && Date.now() - testStart < minDuration; i++) {
+        const size = uploadSizes[Math.floor(Math.random() * uploadSizes.length)];
+        promises.push(testSingleUpload(size, testStart, minDuration));
       }
 
-      // Verificar se já passou 10 segundos
+      const results = await Promise.allSettled(promises);
+      results.forEach(result => {
+        if (result.status === 'fulfilled' && result.value > 0) {
+          speeds.push(result.value);
+        }
+      });
+
+      // Verificar se já passou o tempo mínimo
       if (Date.now() - testStart >= minDuration) break;
     }
 
@@ -228,6 +201,51 @@ export default function TesteVelocidadePage() {
     return validSpeeds.length > 0
       ? validSpeeds.reduce((sum, speed) => sum + speed, 0) / validSpeeds.length
       : 0;
+  };
+
+  const testSingleUpload = async (size: number, testStart: number, minDuration: number): Promise<number> => {
+    return new Promise((resolve) => {
+      const dataSize = size * 1024 * 1024;
+      const data = new Uint8Array(dataSize);
+      for (let i = 0; i < dataSize; i++) {
+        data[i] = Math.floor(Math.random() * 256);
+      }
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/speed-test/upload', true);
+      xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+
+      let startTime = 0;
+      xhr.upload.onprogress = (e) => {
+        if (e.loaded > 0 && startTime === 0) {
+          startTime = Date.now();
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const endTime = Date.now();
+          const duration = (endTime - startTime) / 1000;
+          const speedMbps = duration > 0 ? (dataSize * 8) / (1024 * 1024) / duration : 0;
+
+          setCurrentSpeed(speedMbps);
+          const overallProgress = 70 + ((Date.now() - testStart) / minDuration) * 20; // 70-90% para upload
+          setProgress(Math.min(overallProgress, 90));
+
+          resolve(speedMbps);
+        } else {
+          console.error('Upload failed:', xhr.status);
+          resolve(0);
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error('Upload error');
+        resolve(0);
+      };
+
+      xhr.send(data);
+    });
   };
 
   const stopTest = () => {
@@ -249,9 +267,9 @@ export default function TesteVelocidadePage() {
     if (speed >= 1000) {
       return `${(speed / 1000).toFixed(2)} Gbps`;
     } else if (speed >= 1) {
-      return `${speed.toFixed(2)} Mbps`;
+      return `${speed.toFixed(2)} Mbps (${(speed / 8).toFixed(2)} MB/s)`;
     } else {
-      return `${(speed * 1000).toFixed(0)} Kbps`;
+      return `${(speed * 1000).toFixed(0)} Kbps (${(speed / 8 * 1000).toFixed(0)} KB/s)`;
     }
   };
 
@@ -303,17 +321,18 @@ export default function TesteVelocidadePage() {
                   />
 
                   {/* Progress circle */}
-                  <circle
+                  <motion.circle
                     cx="50"
                     cy="50"
                     r="45"
                     fill="none"
-                    stroke={currentPhase === 'download' ? '#3b82f6' : currentPhase === 'upload' ? '#10b981' : '#6b7280'}
+                    stroke={currentPhase === 'download' ? '#3b82f6' : currentPhase === 'upload' ? '#10b981' : currentPhase === 'ping' ? '#8b5cf6' : '#6b7280'}
                     strokeWidth="8"
                     strokeLinecap="round"
                     strokeDasharray={`${2 * Math.PI * 45}`}
-                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - progress / 100)}`}
-                    className="transition-all duration-300"
+                    initial={{ strokeDashoffset: 2 * Math.PI * 45 }}
+                    animate={{ strokeDashoffset: 2 * Math.PI * 45 * (1 - progress / 100) }}
+                    transition={{ duration: 0.5 }}
                   />
                 </svg>
 

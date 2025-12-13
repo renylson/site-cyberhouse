@@ -35,8 +35,8 @@ router.get('/ping', asyncHandler(async (req, res) => {
 
 // Download test endpoint
 router.get('/download', asyncHandler(async (req, res) => {
-  const size = parseInt(req.query.size) || 1; // Size in MB
-  const chunkSize = 64 * 1024; // 64KB chunks
+  const size = parseInt(req.query.size) || 120; // Size in MB - padrão 120MB
+  const chunkSize = 1024 * 1024; // 1MB chunks - aumentado para melhor performance
   const totalSize = size * 1024 * 1024; // Convert to bytes
 
   res.set({
@@ -45,14 +45,15 @@ router.get('/download', asyncHandler(async (req, res) => {
     'Cache-Control': 'no-cache, no-store, must-revalidate',
     'Pragma': 'no-cache',
     'Expires': '0',
-    'Content-Disposition': 'attachment; filename="speed-test.dat"'
+    'Content-Disposition': 'attachment; filename="speed-test.dat"',
+    'Transfer-Encoding': 'chunked' // Melhor para streams grandes
   });
 
   // Generate and send data in chunks
   let sent = 0;
   const buffer = Buffer.alloc(chunkSize);
 
-  // Fill buffer with random data
+  // Fill buffer with random data once
   for (let i = 0; i < buffer.length; i++) {
     buffer[i] = Math.floor(Math.random() * 256);
   }
@@ -67,6 +68,9 @@ router.get('/download', asyncHandler(async (req, res) => {
 
     res.write(buffer.slice(0, sendSize));
     sent += sendSize;
+
+    // Pequena pausa para não sobrecarregar
+    await new Promise(resolve => setImmediate(resolve));
   }
 
   res.end();
@@ -76,12 +80,25 @@ router.get('/download', asyncHandler(async (req, res) => {
 router.post('/upload', asyncHandler(async (req, res) => {
   let receivedBytes = 0;
   const startTime = process.hrtime.bigint();
+  const maxSize = 600 * 1024 * 1024; // 600MB max para suportar testes maiores
+  let exceeded = false;
 
   req.on('data', (chunk) => {
     receivedBytes += chunk.length;
+    if (receivedBytes > maxSize) {
+      exceeded = true;
+      req.destroy(); // Para o upload se exceder
+    }
   });
 
   req.on('end', () => {
+    if (exceeded) {
+      return res.status(413).json({
+        success: false,
+        error: 'Upload size exceeded'
+      });
+    }
+
     const endTime = process.hrtime.bigint();
     const durationNs = Number(endTime - startTime); // nanoseconds
     const duration = durationNs / 1e9; // seconds
