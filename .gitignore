@@ -32,6 +32,5 @@ docker-compose.override.yml
 *.pem
 *.key
 *.crt
-data/uploads/
-data/uploads/settings/
+data/postgres/*
 
